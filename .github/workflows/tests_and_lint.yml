@@ -37,6 +37,9 @@ jobs:
           cache: pip
           cache-dependency-path: setup.py
       - name: Install dependencies
+        env:
+          # kenlm 0.2.0 declares cmake_minimum_required < 3.5, rejected by CMake 4.
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         run: |
           python -m pip install --upgrade pip
           pip install kenlm==0.2.0
@@ -45,11 +48,16 @@ jobs:
         run: |
           ./scripts/lint.sh ${{ matrix.lint-flags }}
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.8", "3.9", "3.10"]
+        os: [ubuntu-latest]
+        include:
+          # Python 3.7 is not available for ubuntu-24.04 (ubuntu-latest).
+          - python-version: "3.7"
+            os: ubuntu-22.04
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
@@ -61,6 +69,9 @@ jobs:
           cache: pip
           cache-dependency-path: setup.py
       - name: Install python dependencies
+        env:
+          # kenlm 0.2.0 declares cmake_minimum_required < 3.5, rejected by CMake 4.
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         run: |
           python -m pip install --upgrade pip
           pip install kenlm==0.2.0
