@@ -9,6 +9,8 @@ on:
   pull_request:
     branches:
       - "*"
+permissions:
+  contents: read
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -21,15 +23,17 @@ jobs:
           - "--run-only-mypy"
           - "--run-only-bandit"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          persist-credentials: false
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c # v5.0.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install https://github.com/kpu/kenlm/archive/master.zip
+          pip install kenlm==0.2.0
           pip install -e .[dev]
       - name: Run lint checks
         run: |
@@ -40,21 +44,24 @@ jobs:
       matrix:
         python-version: ["3.7", "3.8", "3.9", "3.10"]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          persist-credentials: false
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c # v5.0.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install https://github.com/kpu/kenlm/archive/master.zip
+          pip install kenlm==0.2.0
           pip install -e .[dev]
-      - name: Install codecov dependencies
-        run: |
-          curl -Os https://uploader.codecov.io/latest/linux/codecov
-          chmod +x codecov
       - name: Test with pytest
         run: |
-          pytest --cov=pyctcdecode pyctcdecode/tests -m '${{ matrix.markers }}'
-          ./codecov
+          pytest --cov=pyctcdecode --cov-report=xml pyctcdecode/tests -m '${{ matrix.markers }}'
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@e0b68c6749509c5f83f984dd99a76a1c1a231044 # v4.0.1
+        with:
+          files: ./coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
