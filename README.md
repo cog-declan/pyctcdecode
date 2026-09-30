@@ -12,6 +12,13 @@ A fast and feature-rich CTC beam search decoder for speech recognition written i
 pip install pyctcdecode
 ```
 
+Language model support requires the kenlm python bindings. Install a pinned release rather than
+an unpinned archive of the kenlm master branch:
+
+``` bash
+pip install kenlm==0.2.0
+```
+
 ### Main Features:
 
 - 🔥 hotword boosting

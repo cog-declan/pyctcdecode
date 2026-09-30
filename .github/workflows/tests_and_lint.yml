@@ -9,10 +9,17 @@ on:
   pull_request:
     branches:
       - "*"
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         python-version: [3.9]
         lint-flags:
@@ -21,40 +28,62 @@ jobs:
           - "--run-only-mypy"
           - "--run-only-bandit"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          persist-credentials: false
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c # v5.0.0
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: setup.py
       - name: Install dependencies
+        env:
+          # kenlm 0.2.0 declares cmake_minimum_required < 3.5, rejected by CMake 4.
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         run: |
           python -m pip install --upgrade pip
-          pip install https://github.com/kpu/kenlm/archive/master.zip
+          pip install kenlm==0.2.0
           pip install -e .[dev]
       - name: Run lint checks
         run: |
           ./scripts/lint.sh ${{ matrix.lint-flags }}
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.8", "3.9", "3.10"]
+        os: [ubuntu-latest]
+        include:
+          # Python 3.7 is not available for ubuntu-24.04 (ubuntu-latest).
+          - python-version: "3.7"
+            os: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          persist-credentials: false
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c # v5.0.0
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: setup.py
       - name: Install python dependencies
+        env:
+          # kenlm 0.2.0 declares cmake_minimum_required < 3.5, rejected by CMake 4.
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         run: |
           python -m pip install --upgrade pip
-          pip install https://github.com/kpu/kenlm/archive/master.zip
+          pip install kenlm==0.2.0
           pip install -e .[dev]
-      - name: Install codecov dependencies
-        run: |
-          curl -Os https://uploader.codecov.io/latest/linux/codecov
-          chmod +x codecov
       - name: Test with pytest
         run: |
-          pytest --cov=pyctcdecode pyctcdecode/tests -m '${{ matrix.markers }}'
-          ./codecov
+          pytest --cov=pyctcdecode --cov-report=xml pyctcdecode/tests -m '${{ matrix.markers }}'
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@e0b68c6749509c5f83f984dd99a76a1c1a231044 # v4.0.1
+        with:
+          files: ./coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
